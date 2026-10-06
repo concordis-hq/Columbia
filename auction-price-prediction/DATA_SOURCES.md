@@ -1,232 +1,214 @@
-# Auction Price Prediction: Preliminary Data Source Research
+# Auction Price Prediction: Data Source Research
 
-*Hedonic models for art, watches and other luxury goods. APMA E4903 seminar project. Research date: 2026-10-06.*
+*Hedonic and ML models for watch, art and luxury-goods auction prices. APMA E4903 (Fall 2026) seminar project.*
+*Research date: 2026-10-06. First pass done from search results; verified against the live sites the same day.*
 
-## How this was researched, and confidence tags
+**Confidence tags:**
+- **✅ verified**: checked live on the primary source (page, file, robots.txt or terms of service).
+- **[S]**: from secondary sources.
+- **❓ unknown**: blocked by a bot wall or login, or not checked.
 
-All of this research was done with web search. The sandbox's network proxy blocked direct access to christies.com, sothebys.com, phillips.com, ha.com, artnet.com, kaggle.com, jstor.org, columbia.edu and several data vendors. As a result:
-
-- **Website terms of service and robots.txt files were not read directly.** Statements about them come from secondary sources.
-- Each item is tagged:
-  - **[V]**: verified from a primary or official page.
-  - **[S]**: from search snippets or secondary sources.
-  - **[U]**: uncertain. Check by hand before relying on it.
-- **The reference paper (JSTOR stable/20108831) could not be identified**, because JSTOR is blocked and the ID didn't turn up in search. We need its title and authors to line up our variables with it.
+No CAPTCHAs were bypassed and no logins were used.
 
 ---
 
-## 1. The constraint that decides everything: we must be able to share the data
+## TL;DR
 
-The APMA 4903 instructions (found via search, since the PDF itself was blocked) require public links for three things:
-
-- the slides,
-- the code (Colab or GitHub),
-- **the data, so the work can be re-run** (e.g. posted on Google Drive).
-
-That means the key question is not "can we get the data". It is **"can we legally post it publicly?"** Here is where things stand:
-
-- **No auction house or commercial aggregator gives a licence to redistribute.** Artnet, Artprice, MutualArt, askART, Invaluable, LiveAuctioneers, EveryWatch, WatchCharts, Liv-ex, Classic.com and Hagerty all either prohibit export or charge for access with no redistribution rights.
-- **Scraping auction house websites is a legal grey area.** Heritage Auctions' terms explicitly ban "database scraping." An arbitrator ordered Christie's subsidiary Collectrium to pay Heritage about $1.8M for scraping roughly 3M listings ([artnet News](https://news.artnet.com/art-world/collectrium-heritage-data-theft-lawsuit-1612843)) [S].
-- **Facts and creative content are treated differently.** In the US, bare facts (price, date, dimensions, reference number) generally can't be copyrighted. Catalogue essays and photos can. In the EU there is an additional database right, which affects Dorotheum, Lempertz, Artcurial and Ketterer.
-
-**Proposed pattern (get the instructor to sign off):**
-
-1. Publish the scraper code.
-2. Publish a **facts-only derived table**: house, sale, lot, date, artist or brand, reference number, dimensions, medium or material, estimate low/high, price, sold or bought-in flag, and source URL.
-3. Do **not** publish descriptions or images.
-
-The other option is to publish only the code and pipeline and keep the raw data private.
+1. **The course rule decides the data choice.** The APMA 4903 instructions require that *"Data used should also be world-readable (e.g., uploaded to Google drive so that the Colab or GitHub can be run reproducibly)."* ✅ So the key question is not "can we get it" but **"can we post it publicly?"**
+2. **We cannot republish data from Christie's, Sotheby's, Bring a Trailer, EveryWatch or any commercial database.** Christie's and Sotheby's terms of service explicitly forbid scraping and reuse. ✅
+3. **Shareable datasets that exist today:**
+   - **Watches:** two CC0 Kaggle sets of *dealer asking prices*.
+   - **Art:** a **CC BY 34.2k-sale art auction dataset with estimates** (figshare), the **CC0 Getty Provenance Index** (historical, 1M+ lots) and AppraiSet (CC BY).
+4. **Best modern watch auction data:**
+   - Scrape **Phillips, Antiquorum and Monaco Legend** lot pages. They are visible anonymously, rich in features, and their robots.txt files don't block lot pages.
+   - Or use the **free ALT/FNDATA dataset on AWS** (600k watch lots, 1992 to today). It can't be redistributed, but derived results can be shared.
+5. **Suggested project:** methods from the art literature, applied mainly to **watches**. A watch reference number pins down the item, and very little has been published on watches, so there is room for something new. Art serves as the comparison case. Details in §7.
 
 ---
 
-## 2. Art: what exists
+## 1. Course requirements (APMA 4903, Fall 2026) ✅
 
-### 2a. Auction houses' own websites (free to view, no API)
+Source: [4903-instructions.pdf](https://www.columbia.edu/~chw2/Courses/APMA4903/4903-instructions.pdf)
 
-| House | What's online | How to get it | Notes |
-|---|---|---|---|
-| **Christie's** | Results from about 1998 [U]: artist, title, medium, dimensions, estimates, price realised (includes buyer's premium), images, provenance. Unsold lots show no price. | Scrape the internal JSON search endpoint. | Robots.txt reportedly blocks search pages and `apim.christies.com` [S]. Free-text parsing needed. |
-| **Sotheby's** | Similar fields. Newer results often need a free login [U]. | JS-heavy scrape. | Hardest of the big three. |
-| **Phillips** | **Per-sale results PDFs at predictable URLs** (e.g. `dist.phillips.com/content/web/auction-results/auctionResultsFile_NY010225.pdf`) [S], plus lot pages that show estimates. | PDF parsing plus lot pages. | **Easiest modern source.** The PDF states the premium schedule, so the hammer price can be backed out. |
-| **Bonhams, Dorotheum, Lempertz, Artcurial, Ketterer, Swann, Doyle** | Free results archives. | Apify scrapers already exist [S]. | EU database right applies to the European houses. |
-| **Heritage** | 4M+ lots, free login. | **Do not bulk-scrape** (see the litigation above). | |
-| **Poly / China Guardian** | Chinese-language sites. | Artron/AMMA (paid, Chinese only). | Skip. |
+- Groups of 2–4 people.
+- Meet the professor **2 weeks before** the talk with an outline and references.
+- Send the materials **1 week before**.
+- **Slide 2** lists the 1–3 primary references as standard citations, not URLs.
+- **Each presenter needs a "technical nugget."** That is either a derivation, or a live code demo shown alongside its pseudocode. Talks are stopped for "slop" and "PowerPoint karaoke."
+- **Slides, code and data must all be world-readable,** so that the work is reproducible.
+- **Optional 4th credit point:** an individually written, *replicable* write-up on Medium, Substack, LinkedIn or arXiv. It must link to code and slides, and is due 5 pm one week after the last lecture.
 
-### 2b. Commercial aggregators (buy or subscribe, all non-redistributable)
-
-| Source | Coverage | Cost | Verdict |
-|---|---|---|---|
-| **Artnet Price Database** | 18M+ results since about 1985, 1,800+ houses [S] | $32.50/day; $450–1,175/yr [S]. **Ask Columbia Libraries whether CLIO or Avery has a licence** [U]. | Good for manual spot-checks. Bulk export is forbidden. |
-| **Artprice** | About 30M results [U] | €24/day up to about €500+/yr; data licensing about €7.5k/yr [S] | Aggressive about its IP. Avoid. |
-| **MutualArt** | About 20 years of results | $279–2,499/yr [S] | No export. |
-| **askART, Invaluable, LiveAuctioneers, Barnebys, Masterworks** | Millions of lots | Free to cheap, manual browsing | No redistribution. Masterworks/Barnebys index levels can be cited. |
-| **Artory** | 50M+ records | Business-to-business only | No. |
-| **Blouin Art Sales Index** | Was the standard academic source | **Discontinued** ([Princeton library](https://faq.library.princeton.edu/econ/faq/11354)) [S] | Not available. |
-| **Artsy API** | Artist metadata only, no prices | Free, but **being retired** [S] | Not a price source. |
-| **Sotheby's Mei Moses, ArtTactic, Pi-eX, Art Basel/UBS report** | Index levels and aggregate figures | Free to paid | Use for benchmarks and macro context only. |
-
-### 2c. Free, open or academic datasets (art)
-
-- **Getty Provenance Index: Sales Catalogs** ([github.com/thegetty/provenance-index-csv](https://github.com/thegetty/provenance-index-csv)) **[V]**
-  - **Licence: CC0** (public domain).
-  - Size: about 1M+ lot records and 22k sales.
-  - Fields: artist, title, dimensions, materials, subject, price, estimate, buyer and seller, and **sold / bought-in / passed status**.
-  - Downside: historical only. Coverage is Britain, France, Netherlands and Belgium from about 1670 to 1840, and Germany from 1900 to 1945. Prices are in historical currencies.
-  - **This is the only large lot-level art dataset we can legally redistribute.**
-- **MoMA** ([collection](https://github.com/MuseumofModernArt/collection)) and **Met** ([openaccess](https://github.com/metmuseum/openaccess)) **[V]**
-  - CC0 artist and artwork metadata, including Wikidata and ULAN IDs.
-  - **Feature enrichment only** (e.g. "artist held by MoMA", artist birth/death, nationality). They contain no prices.
-- **AppraiSet** (Mendeley Data, DOI 10.17632/2nfvz8g27c.1) [S]
-  - 10k artworks, 22 variables from auction records, built specifically as an open dataset.
-  - Licence probably CC BY [U]. **Check this first.**
-- **Figshare "Buying a Work of Art or an Artist?"** [S]
-  - 34.2k auction sales of 590 living contemporary artists, 1996–2012, with images.
-  - Licence [U].
-- **Replication packages from published papers**
-  - Beggs & Graddy (AER 2009), openICPSR 113297 [S]: link to it, don't re-host.
-  - Bocart & Hafner (J. Applied Econometrics 2015), ZBW/JAE data archive [S]: per-artist sets such as Renoir (1.8k) and Matisse (441).
-- **Studies whose data is closed** (useful as methods to copy, not as data)
-  - Renneboog & Spaenjers "Buying Beauty" (1.1M sales from Blouin).
-  - Mei & Moses (AER 2002, plus a 2025 deep-learning follow-up).
-  - Korteweg, Kräussl & Verwijmeren (RFS 2016).
-  - Aubry, Kräussl, Manso & Spaenjers "Biased Auctioneers" (JF 2023; 1.09M sales with an image neural net; [open-access PDF](https://openaccess.city.ac.uk/id/eprint/35368/)).
-- **GitHub and Kaggle student scrapes** [S]
-  - Examples: `jasonshi10/art_auction_valuation` (37.6k lots), `marcusrprojects/What-Makes-Art-Valuable` (Christie's and Sotheby's).
-  - These have no licence and are ToS-encumbered. Use them for benchmarking or to bootstrap the parser, not to re-host.
+**Reference paper:** JSTOR stable/20108831 is behind a JSTOR CAPTCHA and has no DOI in Crossref or OpenAlex. **We still need its title and authors.**
 
 ---
 
-## 3. Watches: what exists
+## 2. Is there research on predicting these prices? (art vs watches)
 
-### 3a. Auction houses
+### Art: about 50 years of top-journal research
 
-| House | Coverage and fields | Access | Notes |
-|---|---|---|---|
-| **Phillips** (Geneva/NY/HK, with Bacs & Russo) | **The best structured watch data.** Fields: maker, model, **reference number**, year, case material, movement, dimensions, condition, box and papers, estimates, sold price; unsold flag. Strong from about 2014. Estimated 15–25k lots. | Free website, scrape. | **Rank 1 for watches.** |
-| **Christie's** | Watch lots with estimates and price. Reference and box/papers sit in free text. | Scrape the JSON endpoint. | Needs text parsing. |
-| **Sotheby's** | Similar to Christie's. | Login and JS. | Harder. |
-| **Antiquorum** | Archive going back 50+ years. | Free site (an Apify scraper exists). | Good for long time series. |
-| **Monaco Legend, Loupe This, Bonhams, Dr. Crott** | Smaller, specialist sales. | Free sites or PDFs. | Loupe This includes bid histories. Dr. Crott is in German. |
-| **Heritage** | Timepieces and luxury accessories. | **Anti-scraping terms, enforced in the litigation above.** | Avoid bulk collection. |
-| **eBay sold listings** | High volume, noisy. | **API discontinued** (Finding API shut down Feb 2025; Marketplace Insights covers 90 days and needs business approval) [V]. | Skip. |
-
-### 3b. Aggregators, indices and spec databases
-
-| Source | What it is | Cost / access | Verdict |
-|---|---|---|---|
-| **EveryWatch** | 500k+ auction results back to 1989, from 250+ houses [S] | About $49/mo or $500/yr, no API | **The closest ready-made lot-level database.** Email them and ask for academic access and permission to redistribute. |
-| **WatchCharts API** | Model-level market prices and indices (not individual lots) | API about $5k–8k/yr plus a separate distribution licence [V] | Too expensive. Use the free charts to validate. |
-| **Chrono24 ChronoPulse** | Free index of final sale prices for 140 models [S] | No API | Benchmark only. |
-| **Subdial / Bloomberg Subdial Index, Bob's Watches Rolex report, Knight Frank Luxury Investment Index** | Index levels | Free to cite | Use as macro covariates or targets. |
-| **WatchBase** | Specs for about 41.7k references (calibre, case, complications, production years) | Paid DataFeed API [S] | Useful for **joining specs onto lots by reference number**. Not redistributable. |
-| **AWS Data Exchange "Historical Luxury Watch Auction Sales by Lot"** | Christie's, Sotheby's, Bonhams, Phillips | Price and licence unknown [U] | Worth checking on the listing page. |
-
-### 3c. Academic precedents and open data (watches)
-
-- **Ulmer, Schmid & Widenhorn**, *J. Investment Strategies* ([RePEc](https://ideas.repec.org/a/rsk/journ6/7959635.html)) [V]. More than 60k auction results from 1999 to 2020, hedonic model, 5.5% real annual return. **The closest template to follow.** Email the authors about their data.
-- **Mayer**, Princeton senior thesis, 2022 ([DataSpace](https://dataspace.princeton.edu/handle/88435/dsp01jw827f83x)) [V]. Repeat-sales index on 9.2k Rolex, AP and Patek auction results. **An undergraduate precedent;** check its data appendix for sources.
-- **Kaggle Chrono24 sets** (e.g. `vittoriohaardt/rolex-on-chrono24`, `beridzeg45/watch-prices-dataset`) [S]. These are **asking prices, not auction prices**. Check each licence.
-
----
-
-## 4. Other luxury goods (if we widen scope)
-
-- **Classic cars: Bring a Trailer.** **The richest open-ish data in any category.**
-  - About 230k+ completed auctions since 2014.
-  - Fields: year, make, model, VIN, mileage, bid count, comments; includes an **unsold (reserve-not-met) flag**.
-  - Public pages, and open-source crawlers already exist on GitHub.
-  - Terms of service [U].
-  - Cheap API alternative: oldcarsdata.com (free tier, then $49/mo) [V].
-- **Sneakers: StockX 2019 Data Contest** ([link](https://stockx.com/news/the-2019-data-contest/)) [V].
-  - 99,956 sales, **publicly released for analysis**, widely mirrored.
-  - The most shareable luxury resale dataset found.
-  - Only two product lines and few features.
-- **Wine**
-  - Liv-ex and Wine-Searcher APIs are trade-only (€450+/mo) [S].
-  - The **Ashenfelter Bordeaux dataset** is a classic teaching set, freely circulated, but tiny (27 vintages).
-- **Whisky:** Rare Whisky 101 index levels are free; lot-level data is not.
-- **Handbags:** the same houses as watches (Christie's, Sotheby's, Heritage). Rebag Clair has no API.
-- **Diamonds:** the ggplot2 `diamonds` set (54k stones). Retail prices; useful only as a teaching baseline for hedonic models.
-
----
-
-## 5. Cross-reference: which candidate is best?
-
-Scored on the course's needs:
-
-- **Sharable:** can the data be redistributed?
-- **Modern:** does it cover the recent market?
-- **Hedonic features:** how many characteristics per item?
-- **Unsold flag:** do we know which lots failed to sell? This matters for selection bias.
-- **Size**
-- **Effort:** how hard is it to collect?
-
-| Candidate | Sharable | Modern | Hedonic features | Unsold flag | Size | Effort | Cost |
-|---|---|---|---|---|---|---|---|
-| **A. Phillips watches (own scrape)** | ◐ facts-only | ✅ 2014–26 | ✅✅ ref, material, year, box/papers | ✅ | 15–25k | Medium | Free |
-| **B. Phillips + Christie's art (own scrape, PDFs)** | ◐ facts-only | ✅ | ✅ artist, medium, size, year | ✅ | 50k+ | Medium–high | Free |
-| **C. Getty Provenance Index + MoMA/Wikidata** | ✅ CC0 | ❌ historical | ✅ | ✅ | 1M+ | Low–medium | Free |
-| **D. Bring a Trailer cars** | ◐ | ✅ | ✅✅ | ✅ | 230k | Low (existing crawlers) | Free |
-| **E. AppraiSet / Figshare / JAE art sets** | ✅? (licence to confirm) | ◐ ≤2012–2022 | ✅ | ◐ | 1–34k | Low | Free |
-| **F. EveryWatch (academic request)** | ❓ only if they grant it | ✅ | ✅ | ✅ | 500k | Low | ~$500/yr or grant |
-| **G. Artnet via library** | ❌ | ✅ | ✅ | ✅ | 18M | Manual only | Library |
-| **H. Kaggle Chrono24** | ◐ check licence | ✅ | ✅ | ❌ (asking prices) | 45–280k | Low | Free |
-
-### Recommendation
-
-1. **Primary dataset: Phillips watch auctions (Candidate A).**
-   - Watches are the better choice of the two categories for a hedonic model.
-     - **Watches are near-fungible:** a reference number pins down most of the characteristics, so the regression is far better identified than for one-of-a-kind paintings.
-     - **Phillips data is the cleanest and most structured** of any free source.
-   - Parse the free text into features (brand, reference, year, material, complications, box/papers) with regex or an LLM.
-   - Join specs on reference number.
-   - Use ChronoPulse and Knight Frank index levels as market covariates.
-2. **Art component: Phillips and Christie's modern art scrape (Candidate B)**, with a **CC0 backbone (Candidate C)**.
-   - The Getty data provides a fully shareable, very large historical hedonic and repeat-sales exercise.
-   - It's also a strong fallback if the instructor won't accept scraped modern data.
-   - Enrich artists with MoMA, Met and Wikidata features.
-3. **Optional third category: Bring a Trailer.** It is the largest structured luxury dataset with an unsold flag, and crawlers already exist.
-4. **In parallel, send emails:**
-   - **EveryWatch:** academic data access plus permission to redistribute.
-   - **Ulmer et al.:** their 60k watch dataset.
-   - **Columbia Libraries:** whether we have Artnet or askART for spot-checks.
-   - **The professor:** whether "code + facts-only table, raw data private" satisfies the reproducibility rule.
-
-### Modelling notes for later
-
-- **Price definition.** Price realised includes the buyer's premium, and the premium schedule changes over time. Convert to hammer price, or control for the schedule.
-- **Selection bias.** Bought-in lots have no price. Use a Heckman or Tobit-style correction, or model "sold" separately. Korteweg et al. (RFS 2016) is the reference.
-- **Pre-sale estimates as a benchmark.** The auction house's low/high estimate is a strong baseline forecast. A "beat the estimate" test is a clean, publishable framing.
-- **Currency.** Normalise to USD and deflate with CPI.
-
----
-
-## 6. Using DeepWiki to speed up the scraper work
-
-[DeepWiki](https://deepwiki.com) generates documentation for any public GitHub repo and lets you ask questions about it: swap `github.com` for `deepwiki.com` in the repo URL. *It was blocked in the research sandbox, so it has not been tried on these repos yet.*
-
-Its best use for this project is reading existing scrapers and datasets **before writing our own**: which endpoints they call, which fields they pull, and what they do about pagination and logins. Repos to try:
-
-| Repo | What to ask DeepWiki |
+| Work | Contribution |
 |---|---|
-| `thegetty/provenance-index-csv` | Schema of the `sales_catalogs` tables, how lots join to sales, and how price, currency and transaction type are encoded |
-| `MuseumofModernArt/collection`, `metmuseum/openaccess` | Artist fields available for joins (Wikidata, ULAN IDs) |
-| `marcusrprojects/What-Makes-Art-Valuable` | Christie's and Sotheby's endpoints, and how fields are parsed and cleaned |
-| `bradgwest/paap` | Christie's scraping pipeline (the repo is archived) |
-| `ventositwaitang/Sotheby-s-and-Christie-s` | Sotheby's scraping method |
-| `jasonshi10/art_auction_valuation`, `ahmedhosny/theGreenCanvas` | Feature engineering, including image features |
-| `gisturiz/BaT-Auction-Crawler`, `KaledDahleh/bring-a-trailer-tracker` | Bring a Trailer results scraping |
-| `philmorefkoung/Webscrapped-Watch-Dataset` | Watch field parsing (reference number, material) |
+| Anderson (1974); Baumol (1986, *AER*) | Art as an investment, with low and volatile returns |
+| Goetzmann (1993, *AER*) | Repeat-sales price indices |
+| Mei & Moses (2002, *AER*) | Repeat-sales index; masterpieces underperform |
+| Ashenfelter & Graddy (2003, *J. Econ. Lit.*) | The standard survey ("Auctions and the Price of Art") |
+| Beggs & Graddy (2009, *AER*) | Anchoring effects |
+| Renneboog & Spaenjers (2013, *Management Science*) | Hedonic index on 1.1M sales |
+| Korteweg, Kräussl & Verwijmeren (2016, *RFS*) | Selection bias from unsold lots |
+| **Aubry, Kräussl, Manso & Spaenjers (2023, *J. Finance*)** ([PDF](https://openaccess.city.ac.uk/id/eprint/35368/1/Biased%20Auctioneers%20JF.pdf)) | Neural network on images plus lot features, 1.2M paintings. Its valuations predict price-to-estimate ratios and which lots go unsold; auctioneer errors are persistent. **The ML benchmark to beat.** |
 
-DeepWiki also runs a free MCP server, `https://mcp.deepwiki.com/mcp`, so Claude can query these repos directly once it is added as a connector in an environment where it isn't blocked.
+The art literature is rigorous but the problem is hard: every painting is unique, and most of the explained variation comes from the artist's identity. The best datasets (Blouin, Artnet) are proprietary.
+
+### Watches: a thin literature
+
+- **Ulmer, Schmid & Widenhorn (2024)**, *J. Investment Strategies*, [doi:10.21314/jois.2024.006](https://www.risk.net/journal-of-investment-strategies/7959635/). Hedonic model on more than 60k auction results from 1999–2020. The data source is not named in the abstract. ✅
+- **Weisskopf & Masset (2025)**, "Time is Money: an Investment in Luxury Watches", SSRN 5119075. Not yet read.
+- **Mayer (2022)**, Princeton senior thesis ([link](https://dataspace.princeton.edu/handle/88435/dsp01jw827f83x)). Repeat-sales index on 9,159 Rolex, AP and Patek auction results scraped from collectorsquare.com. ✅
+- Everything else is industry reports: BCG (2023), Morgan Stanley with WatchCharts, Knight Frank, Bob's Watches.
+
+### Takeaway
+
+- **Rigour:** art is far ahead.
+- **Modelling fit and novelty:** watches are ahead. A reference number pins down most hedonic characteristics, the same reference resells many times, and very little has been published.
 
 ---
 
-## 7. Open items to resolve by hand (blocked in this sandbox)
+## 3. Watches: where the data is
 
-- [ ] Identify the reference paper JSTOR 20108831 (title and authors).
-- [ ] Read the terms of service and robots.txt of Phillips, Christie's, Sotheby's and Bring a Trailer.
-- [ ] Confirm the licences of AppraiSet, the Figshare dataset and the Kaggle sets.
-- [ ] Check the price and licence of the AWS Data Exchange watch-lots listing.
-- [ ] Check whether Sotheby's prices require a login.
-- [ ] Ask a Columbia librarian about Artnet and askART access.
+### 3a. Auction house websites (free to view, no APIs)
+
+| House | What an anonymous visitor sees | Structure | robots.txt / terms |
+|---|---|---|---|
+| **Phillips** ✅ | Lot pages such as [Patek 5711/1P](https://www.phillips.com/detail/patek-philippe/178098). Fields: Manufacturer, Year, Reference No, Model Name, Material, Calibre, Dimensions, **Estimate**, **Sold For**. Box and papers appear in the "Accessories" text. The sale page ([CH080123](https://www.phillips.com/auction/CH080123)) lists every lot with reference, estimate and sold price. | Server-rendered React/Remix HTML, so the data is in the page. JSON-LD `offers.price` holds the **low estimate**, not the sold price. **Plain HTTP requests get a 403; a headless browser is needed.** | robots.txt disallows only `/search`, `/*/filter/` and `/bin/`. No website terms of service found. Conditions of Sale claim copyright on catalogue text and images. |
+| **Antiquorum** ✅ | Price lists with **hammer and premium-inclusive** prices ([example](https://catalog.antiquorum.swiss/en/auctions/371/price-list)). Lot pages show estimate, sold price, **condition grade** (e.g. "AA"), brand, model, reference, year, diameter and provenance. | Plain server-rendered HTML; the easiest to collect. Records go back 50+ years. | robots.txt blocks only `/users/`. `Crawl-delay: 5`. |
+| **Monaco Legend** ✅ | Estimate, premium-inclusive result, reference, year, case material, accessories ([example](https://www.monacolegendauctions.com/auction/exclusive-timepieces-41/lot-10)). | Server-rendered with schema.org JSON-LD. The sitemap lists about 22 sales (numbers 14–43). | Not checked. |
+| **Christie's** ✅ | Price realised and estimate are visible; watch details are in free text. | JSON-LD plus a Next.js data stream. | **Terms forbid scraping:** "You will not … use any robot, spider, scripts … to data mine or scrape any of the content". |
+| **Sotheby's** ✅ | Estimates are visible, but results show **"Log in to view results"**. | | **Terms forbid "screen scraping," "database scraping"**. `Crawl-delay: 15`. |
+| **Heritage** | Blocked by a DataDome CAPTCHA. | | Heritage won about $1.8M from Christie's subsidiary Collectrium over scraping ([artnet](https://news.artnet.com/art-world/collectrium-heritage-data-theft-lawsuit-1612843)) [S]. **Avoid.** |
+
+**Phillips volume ✅:** 101 watch sales since 2016, currently 10–13 a year. That is roughly 1.5–2.5k lots a year and about 15–20k lots in total.
+
+### 3b. Aggregators and paid data
+
+| Source | What it is | Cost | Redistribution |
+|---|---|---|---|
+| **ALT/FNDATA on AWS Data Exchange** ✅ ([listing](https://aws.amazon.com/marketplace/pp/prodview-jlpgxlg75fmae)) | "Historical Luxury Watch Auction Sales by Lot (Christie's, Sotheby's, Bonhams, Phillips)". Over 600k lots from 240+ houses, 1992 to today, 330k+ realised prices, daily updates. No data dictionary published. | **Free** on AWS. The provider also has a ["For Educators" academy](https://academy.altfndata.com/). | **No.** The subscriber "may not publish, disseminate, distribute … the Data". Derived data is allowed. |
+| **EveryWatch** ✅ | Auction aggregator. | $179.88–10,000/yr. No API. | **No.** Terms ban "crawling for Content … Any automated use". |
+| **WatchCharts API** | Model-level price indices. | About $5–8k/yr [S]. | ❓ The site is behind a Cloudflare challenge. |
+| **Chrono24 / ChronoPulse** | Asking-price marketplace and a free index. | No public API found. | ❓ Behind a Cloudflare challenge. |
+| **WatchBase** | Spec database (about 41.7k references). | Paid DataFeed [S]. | No [S]. |
+| **eBay** ✅ | | The Finding API was shut down in Feb 2025; Marketplace Insights is restricted and covers only 90 days. | |
+
+### 3c. Shareable watch datasets ✅ (asking prices, not auction prices)
+
+| Kaggle dataset | Licence | Size | Columns |
+|---|---|---|---|
+| `vittoriohaardt/rolex-on-chrono24` | **CC0** | 87,117 × 12 | model, reference number, price, movement, case material, diameter, year, condition, **scope of delivery** (box/papers), location. Scraped 4 Dec 2022. |
+| `yoerireumkens/timepiece-treasures-a-luxury-watches-dataset` | **CC0** | 163,598 × 10 | brand, model, reference, complication, case/bracelet material, dial, price. No source or date fields. |
+| `beridzeg45/watch-prices-dataset` | "Other", but no licence text is given | 45,024 × 23 | Treat as **not shareable**. |
+
+---
+
+## 4. Art: where the data is
+
+### 4a. Auction house websites
+
+| House | What an anonymous visitor sees | Notes |
+|---|---|---|
+| **Christie's** ✅ | Price realised and estimate are visible ([example lot](https://www.christies.com/en/lot/lot-6110562)). The JSON-LD Product block contains the price realised. | **Terms forbid scraping and use in any "database … or compilation".** `window.chrComponents` (which old scrapers used) no longer exists. |
+| **Sotheby's** ✅ | Estimates are visible; **results are hidden behind a login**. | Terms forbid scraping. `Crawl-delay: 15`. |
+| **Phillips** ✅ | Lot and sale pages show estimate and sold price ([NY010225](https://www.phillips.com/auction/NY010225)). **Results PDFs** list lot number and premium-inclusive price ([example](https://www.dist.phillips.com/content/web/auction-results/auctionResultsFile_NY010225.pdf)). Lots missing from the PDF did not sell. | Needs a headless browser. No website terms of service found. |
+| Bonhams, Heritage | ❓ Behind Cloudflare and DataDome bot walls. | |
+
+### 4b. Commercial databases (none can be republished)
+
+| Source | Notes |
+|---|---|
+| **Artnet Price Database** | 18M+ results; $32.50/day or $450–1,175/yr [S]. Whether Columbia Libraries has access is ❓: CLIO's bot check blocked automated lookup, so **check in a browser**. |
+| **Artprice, MutualArt, askART, Invaluable, LiveAuctioneers, Barnebys, Artory** | Paid or manual-only access; no redistribution [S]. |
+| **Blouin Art Sales Index** | Discontinued [S]. It was the source behind many papers and datasets. |
+| **Artsy API** | Being retired; has no prices [S]. |
+
+### 4c. Shareable and academic art datasets
+
+| Dataset | Licence | What's in it |
+|---|---|---|
+| **"Buying a Work of Art or an Artist?"** (Springer Nature figshare, [DOI 10.6084/m9.figshare.24746268](https://springernature.figshare.com/articles/dataset/24746268)) ✅ | **CC BY 4.0** | **34,200 auction sales**, 590 living contemporary artists, 1996–2012, 23 countries. Columns: artist, nationality, birth year, artwork year, genre, auction house, `price_usd`, `real_price_usd`, **`estimate_min`/`estimate_max`**, `Ham_Prem` (hammer or premium flag), materials, height/width/depth, image link, plus ML-ready files. Caveat: the records originate from Blouin, but the publisher released them under CC BY. **The best modern, shareable art dataset found.** |
+| **Getty Provenance Index: Sales Catalogs** ([GitHub](https://github.com/thegetty/provenance-index-csv)) ✅ | **CC0** | 1M+ lots and 22k sales, about 2.9 GB of CSV on S3. Coverage: 1650–1850 (Britain, France, Netherlands, Belgium, Germany, Scandinavia) and 1900–1945 (Germany, Austria, Switzerland). Columns: `transaction` (Sold / Bought In / Passed / Withdrawn), `price_amount_1..3` (hammer or high bid), `price_currency`, `est_price`, artist, dimensions, buyer and seller; tables join on `catalog_number`. Historical currencies. |
+| **AppraiSet** (Mendeley, DOI 10.17632/2nfvz8g27c.1) ✅ | **CC BY 4.0** | 10k artworks, up to 22 variables. Field list ❓ because the Mendeley page returned a 502 error. |
+| **MoMA** / **Met** open-access collections ✅ | **CC0** | Artist features to join on: nationality, gender, birth/death, Wikidata QID, ULAN ID. No prices. |
+| Beggs & Graddy, openICPSR 113297 ✅ | Depositor's custom licence (text ❓) | Christie's and Sotheby's repeat sales, 1980–94, as Stata files. **Link to it, don't re-host it.** |
+| Kaggle "the-price-of-art" ✅ | **Rules forbid reposting** | Estimates, price realised, provenance, literature. Benchmark use only. |
+| Bocart & Hafner (JAE archive) ✅ | — | **No data deposited** (Artnet doesn't allow it). |
+| GitHub scrapes ✅ (`marcusrprojects/What-Makes-Art-Valuable`, `jasonshi10/art_auction_valuation`, `bradgwest/paap`, `ventositwaitang/Sotheby-s-and-Christie-s`) | No licence, except ventositwaitang (MIT code) | Small (168 to 37.6k rows). The scraping methods are **out of date** for the current Christie's site and rely on endpoints that robots.txt disallows. Reference only. |
+
+---
+
+## 5. Other luxury goods (if we widen scope)
+
+- **Bring a Trailer (classic cars)** ✅
+  - 266,857 completed auctions, visible anonymously, with JSON embedded in the results page.
+  - **But its terms forbid scraping and explicitly forbid using its data to train "any artificial intelligence or other algorithm … model".** Avoid.
+  - Paid alternative: oldcarsdata API, free for 10 requests a month, then $49–699/mo. Its terms don't allow redistribution.
+- **StockX 2019 Data Contest (sneakers)** ✅
+  - 99,956 sales, still downloadable ([xlsx](https://s3.amazonaws.com/stockx-sneaker-analysis/wp-content/uploads/2019/02/StockX-Data-Contest-2019-3.xlsx)).
+  - Released publicly for analysis, but the file carries no licence text.
+- **Wine:**
+  - Liv-ex and Wine-Searcher are trade-only or enterprise-priced [S].
+  - The Ashenfelter Bordeaux set is a freely circulated teaching dataset, but tiny.
+- **Whisky:** Rare Whisky 101 publishes index levels only [S].
+- **Handbags:** sold by the same houses as watches; same constraints.
+
+---
+
+## 6. Using DeepWiki
+
+[DeepWiki](https://deepwiki.com) answers questions about public GitHub repos. Its **MCP endpoint `https://mcp.deepwiki.com/mcp` works** ✅ (tools `read_wiki_structure`, `read_wiki_contents`, `ask_wiki_question`).
+
+Of the 11 repos we care about, **only `MuseumofModernArt/collection` and `metmuseum/openaccess` are indexed.** The Getty repo and every auction-scraper repo return "Repository not found". To index a public repo, open `deepwiki.com/<owner>/<repo>` in a browser.
+
+DeepWiki becomes more useful once **our own** project repo is on GitHub, for onboarding teammates. For the existing scrapers, the code was read directly (§4c).
+
+---
+
+## 7. Cross-reference and recommendation
+
+| Candidate | Shareable | Modern | Hedonic features | Unsold flag | Size | Effort |
+|---|---|---|---|---|---|---|
+| **A. Phillips + Antiquorum + Monaco Legend watch scrape** | ◐ code plus facts-only table | ✅ | ✅✅ reference, year, material, grade, box/papers | ✅ | ~20–40k | Medium (headless browser for Phillips) |
+| **B. ALT/FNDATA watches (AWS)** | ❌ raw data / ✅ derived results | ✅ 1992–today | ✅ (dictionary unseen) | ? | 600k | Low |
+| **C. figshare contemporary art (CC BY)** | ✅ | ◐ 1996–2012 | ✅ with estimates | ❌ (sold lots only) | 34.2k | **Very low** |
+| **D. Getty Provenance Index (CC0) + MoMA/Wikidata** | ✅ | ❌ historical | ✅ | ✅ | 1M+ | Low–medium |
+| **E. Kaggle Chrono24 watches (CC0)** | ✅ | ✅ 2022 | ✅ | ❌ asking prices | 87k / 164k | Very low |
+| F. Christie's / Sotheby's scrape | ❌ terms forbid it | ✅ | ✅ | ✅ | large | High |
+
+### Recommended plan
+
+1. **Watches are the main topic.**
+   - Collect Phillips, Antiquorum and Monaco Legend lot pages (Candidate A), politely and following robots.txt.
+   - Publish the code plus a **facts-only table**: house, sale, lot, date, brand, reference, year, material, estimates, price, sold flag, URL. Leave out descriptions and images.
+   - **Ask the professor** whether this, or "code public, raw data private", satisfies the world-readable rule.
+   - Use the **CC0 Chrono24 set (E)** as a fully shareable fallback and to compare asking prices with auction prices.
+2. **Subscribe to ALT/FNDATA (B) for free** and use it for model training and validation if its fields hold up. Email them about the educators programme and about sharing permission.
+3. **Art is the comparison case.**
+   - Use the **figshare CC BY set (C)**: fully shareable, already has estimates, and is ML-ready.
+   - Optionally add a historical chapter on the **Getty data (D)**.
+   - **Do not scrape Christie's or Sotheby's.**
+4. **Model and nugget ideas:**
+   - Hedonic log-price regression with time dummies, which also gives a price index. The derivation can be the nugget.
+   - A Heckman-style correction for unsold lots (Korteweg et al.).
+   - Gradient boosting or a neural net, compared against **the auction house's own estimate as the baseline** ("can we beat the auctioneer?", as in Aubry et al.).
+   - Data hygiene: convert premium-inclusive prices to hammer prices, convert to USD, and deflate with CPI.
+
+---
+
+## 8. Open items
+
+- [ ] **Reference paper:** title and authors for JSTOR 20108831 (it's behind a CAPTCHA).
+- [ ] Ask the professor whether a facts-only table or private raw data satisfies "world-readable data".
+- [ ] Subscribe to ALT/FNDATA on AWS (free) and inspect its fields; email about the educators programme and redistribution.
+- [ ] Find a Phillips website terms-of-service page (none found), and check Antiquorum's and Monaco Legend's terms.
+- [ ] Check in a browser whether CLIO lists Artnet, askART or Artprice.
+- [ ] Get the AppraiSet field list (Mendeley was returning errors).
+- [ ] Read Weisskopf & Masset (2025) and the Ulmer et al. working paper to find their watch data sources.
+- [ ] WatchCharts and Chrono24 terms (blocked by Cloudflare).
