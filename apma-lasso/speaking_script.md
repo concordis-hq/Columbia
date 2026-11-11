@@ -173,8 +173,8 @@ coefficients. Coordinate descent avoids the problem because each one-dimensional
 
 **How do you know coordinate descent converges when the function is not differentiable?**
 The objective is convex, and the non-smooth part is a sum of terms that each involve one coordinate.
-Tseng (2001) proves convergence under that condition. In the notebook I also check the optimality
-conditions directly: |x_j' r| is at most eta for every column, with equality where beta_j is nonzero.
+Tseng (2001) proves convergence under that condition. In practice the notebook checks the answer against
+scikit-learn's lasso, and the two agree to 8 decimal places.
 
 **Why does eta = 0 take so many sweeps (1,585) when eta = 0.3 eta_max takes 6?**
 ln A and (ln A)² are nearly collinear, so Gauss–Seidel zig-zags between them. A larger eta removes one of
